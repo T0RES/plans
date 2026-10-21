@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>План-сетка постов</title>
+<style>
+:root{--bg:#f6f5f1;--surface:#fff;--text:#1f1f1c;--muted:#76746c;--line:#e4e2da;--accent:#3d5afe;--accent-soft:#e8ecff;--today:#fff4d6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--surface:#222226;--text:#ececec;--muted:#9a9aa2;--line:#34343a;--accent:#8c9eff;--accent-soft:#2b2f4d;--today:#3a3320;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17171a;--surface:#222226;--text:#ececec;--muted:#9a9aa2;--line:#34343a;--accent:#8c9eff;--accent-soft:#2b2f4d;--today:#3a3320;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:860px){.wrap{grid-template-columns:1fr 320px;align-items:start}}
+header{grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h1{font-size:20px;margin:0 auto 0 0}
+button{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.month{font-weight:600;min-width:150px;text-align:center;text-transform:capitalize}
+.cal{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.dow{padding:8px 6px;font-size:12px;color:var(--muted);text-align:center;border-bottom:1px solid var(--line)}
+.day{min-height:84px;padding:6px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);cursor:pointer;overflow:hidden;background:var(--surface);text-align:left;border-radius:0;font-size:12px;display:block;width:100%}
+.day:nth-child(7n){border-right:0}
+.day:hover{background:var(--accent-soft)}
+.day.out{opacity:.45}
+.day.today{background:var(--today)}
+.day.sel{outline:2px solid var(--accent);outline-offset:-2px;background:var(--accent-soft)}
+.num{font-weight:600;font-size:13px;display:block;margin-bottom:3px}
+.chip{display:block;background:var(--accent-soft);color:var(--text);border-left:3px solid var(--accent);border-radius:3px;padding:1px 4px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.done{text-decoration:line-through;opacity:.6}
+.more{color:var(--muted);font-size:11px;margin-top:2px;display:block}
+aside{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+aside h2{font-size:16px;margin:0 0 12px;text-transform:capitalize}
+.empty{color:var(--muted)}
+.note{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.note input[type=checkbox]{margin-top:4px}
+.note .t{flex:1;word-break:break-word;white-space:pre-wrap}
+.note.done .t{text-decoration:line-through;color:var(--muted)}
+.note button{padding:2px 8px;font-size:13px}
+textarea{width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical;min-height:70px;margin-top:12px}
+.row{display:flex;gap:8px;margin-top:8px;align-items:center}
+.status{font-size:12px;color:var(--muted);margin-left:auto}
+@media(max-width:560px){.day{min-height:62px;padding:4px}.chip{font-size:10px}}
+.banner{grid-column:1/-1;background:var(--today);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📅 План-сетка постов <small style="font-weight:400;font-size:11px;color:var(--muted)">v2</small></h1>
+    <button id="prev" aria-label="Предыдущий месяц">←</button>
+    <div class="month" id="month"></div>
+    <button id="next" aria-label="Следующий месяц">→</button>
+    <button id="today">Сегодня</button>
+  </header>
+  <div id="banner" class="banner" hidden></div>
+  <div class="cal"><div class="grid" id="grid"></div></div>
+  <aside>
+    <h2 id="seltitle"></h2>
+    <div id="list"></div>
+    <textarea id="input" placeholder="Какой пост должен выйти в этот день?"></textarea>
+    <div class="row"><button class="primary" id="add">Добавить</button><span class="status" id="status"></span></div>
+  </aside>
+</div>
+<script>
+// ====== НАСТРОЙКА: вставьте сюда данные вашего проекта Supabase ======
+var SUPABASE_URL = "https://jlnspekqalhibdfzknre.supabase.co";   // например: https://abcdxyz.supabase.co
+var SUPABASE_KEY = "sb_publishable_LSt__uOOOaSSlCOlNiUWoA_tVG4TWsF";   // ключ «anon» или «publishable»
+// =====================================================================
+(function(){
+var LS='content-plan-items', items={}, pending=0;
+var remoteOn=!!(SUPABASE_URL&&SUPABASE_KEY);
+var now=new Date(), view=new Date(now.getFullYear(),now.getMonth(),1), sel=key(now);
+
+function key(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function parse(k){var p=k.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+function uid(){return Math.random().toString(36).slice(2,8)+Date.now().toString(36);}
+function $(id){return document.getElementById(id);}
+function setStatus(s){$('status').textContent=s;}
+
+function api(path,opt){
+  opt=opt||{};
+  var h={apikey:SUPABASE_KEY,'Content-Type':'application/json'};
+  if(opt.headers)Object.assign(h,opt.headers);
+  return fetch(SUPABASE_URL.replace(/\/$/,'')+'/rest/v1/'+path,{method:opt.method||'GET',headers:h,body:opt.body}).then(function(r){
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.status===204?null:r.text().then(function(t){return t?JSON.parse(t):null;});
+  });
+}
+function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(items));}catch(e){}}
+function loadLocal(){try{var r=localStorage.getItem(LS);if(r)return JSON.parse(r);}catch(e){}return {};}
+
+function grouped(){
+  var g={};
+  Object.keys(items).forEach(function(id){var x=items[id];(g[x.day]=g[x.day]||[]).push(Object.assign({id:id},x));});
+  Object.keys(g).forEach(function(k){g[k].sort(function(a,b){return (a.ts||0)-(b.ts||0);});});
+  return g;
+}
+
+function put(id,data){
+  items[id]=data; saveLocal(); render();
+  if(!remoteOn){setStatus('Сохранено только в этом браузере');return;}
+  pending++; setStatus('Сохраняю…');
+  api('notes',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(Object.assign({id:id},data))})
+    .then(function(){setStatus('Сохранено ✓');})
+    .catch(function(){setStatus('Не удалось сохранить — проверьте интернет и настройки');})
+    .then(function(){pending--;});
+}
+function remove(id){
+  delete items[id]; saveLocal(); render();
+  if(!remoteOn)return;
+  pending++;
+  api('notes?id=eq.'+encodeURIComponent(id),{method:'DELETE'})
+    .catch(function(){setStatus('Не удалось удалить');})
+    .then(function(){pending--;});
+}
+function pull(){
+  if(!remoteOn||pending>0||document.hidden)return;
+  api('notes?select=*&order=ts.asc').then(function(rows){
+    if(pending>0)return;
+    var next={};
+    rows.forEach(function(r){next[r.id]={day:r.day,body:r.body,done:!!r.done,ts:Number(r.ts)||0};});
+    if(JSON.stringify(next)!==JSON.stringify(items)){items=next;saveLocal();render();}
+    setStatus('Общий календарь ✓');
+  }).catch(function(){setStatus('Нет связи с базой данных');});
+}
+
+function render(){
+  var notes=grouped();
+  var months=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+  $('month').textContent=months[view.getMonth()]+' '+view.getFullYear();
+  var g=$('grid'); g.innerHTML='';
+  ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].forEach(function(n){var d=document.createElement('div');d.className='dow';d.textContent=n;g.appendChild(d);});
+  var first=new Date(view.getFullYear(),view.getMonth(),1);
+  var offset=(first.getDay()+6)%7;
+  var start=new Date(view.getFullYear(),view.getMonth(),1-offset);
+  var todayK=key(new Date());
+  for(var i=0;i<42;i++){
+    var d=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i), k=key(d);
+    if(i>=35 && d.getMonth()!==view.getMonth())break;
+    var b=document.createElement('button');
+    b.className='day'+(d.getMonth()!==view.getMonth()?' out':'')+(k===todayK?' today':'')+(k===sel?' sel':'');
+    var n=document.createElement('span');n.className='num';n.textContent=d.getDate();b.appendChild(n);
+    var arr=notes[k]||[];
+    arr.slice(0,2).forEach(function(x){var c=document.createElement('span');c.className='chip'+(x.done?' done':'');c.textContent=x.body;b.appendChild(c);});
+    if(arr.length>2){var m=document.createElement('span');m.className='more';m.textContent='ещё '+(arr.length-2);b.appendChild(m);}
+    (function(kk){b.onclick=function(){sel=kk;var p=parse(kk);if(p.getMonth()!==view.getMonth())view=new Date(p.getFullYear(),p.getMonth(),1);render();};})(k);
+    g.appendChild(b);
+  }
+  renderSide(notes);
+}
+function renderSide(notes){
+  var p=parse(sel);
+  $('seltitle').textContent=p.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var l=$('list'); l.innerHTML='';
+  var arr=notes[sel]||[];
+  if(!arr.length){var e=document.createElement('div');e.className='empty';e.textContent='На этот день пока ничего не запланировано.';l.appendChild(e);}
+  arr.forEach(function(x){
+    var r=document.createElement('div');r.className='note'+(x.done?' done':'');
+    var c=document.createElement('input');c.type='checkbox';c.checked=!!x.done;c.title='Опубликовано';
+    c.onchange=function(){put(x.id,{day:x.day,body:x.body,done:c.checked,ts:x.ts});};
+    var t=document.createElement('div');t.className='t';t.textContent=x.body;
+    var ed=document.createElement('button');ed.textContent='✎';ed.title='Изменить';
+    ed.onclick=function(){var v=prompt('Изменить заметку',x.body);if(v!==null&&v.trim())put(x.id,{day:x.day,body:v.trim(),done:x.done,ts:x.ts});};
+    var del=document.createElement('button');del.textContent='✕';del.title='Удалить';
+    del.onclick=function(){remove(x.id);};
+    r.append(c,t,ed,del);l.appendChild(r);
+  });
+}
+
+$('add').onclick=function(){
+  var v=$('input').value.trim();if(!v)return;
+  $('input').value='';
+  put(uid(),{day:sel,body:v,done:false,ts:Date.now()});
+};
+$('input').addEventListener('keydown',function(e){if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))$('add').click();});
+$('prev').onclick=function(){view=new Date(view.getFullYear(),view.getMonth()-1,1);render();};
+$('next').onclick=function(){view=new Date(view.getFullYear(),view.getMonth()+1,1);render();};
+$('today').onclick=function(){var t=new Date();view=new Date(t.getFullYear(),t.getMonth(),1);sel=key(t);render();};
+
+items=loadLocal();
+if(!remoteOn){var bn=$('banner');bn.hidden=false;bn.textContent='Общая база данных ещё не подключена: заметки сохраняются только в этом браузере. Вставьте адрес и ключ Supabase в начало кода страницы (см. инструкцию).';}
+render();
+if(remoteOn){
+  // переносим локальные заметки в общую базу один раз (по id, без дублей)
+  pull();
+  setInterval(pull,5000);
+  document.addEventListener('visibilitychange',pull);
+  window.addEventListener('focus',pull);
+}
+})();
+</script>
+</body>
+</html>
